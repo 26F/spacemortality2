@@ -94,6 +94,8 @@ bool isitem = false;
 bool itemwarp = false;
 bool combatmode = false;
 bool hostile = false;
+bool indatabase = false;
+bool battlewon = false;
 
 static int16_t playerposxbackup = 0;
 static int16_t playerposybackup = 0;
@@ -175,11 +177,11 @@ void setup()
 	arduboy.clear();
 
 
-	srand(sector);
+	//
 
 	arduboy.invert(false);
 
-	newstars();
+	sectorparameters();
 
 }
 
@@ -284,9 +286,7 @@ void restartgame()
 
     arduboy.invert(false);
 
-    srand(sector);
-
-    newstars();
+    sectorparameters();
 
 
 }
@@ -698,7 +698,7 @@ static uint8_t helddown()
 
 	if (arduboy.justPressed(A_BUTTON) || ((held & (1 << BA)) > 0)) {
 
-		 if (combatmode && (modulu % 4 == 0) && ammo > 0) {
+		 if ((combatmode && (modulu % 4 == 0)) && (ammo > 0) && (!indatabase)) {
 
 			arduboy.drawLine(0, 64, SCREENWIDTH / 2, SCREENHEIGHT / 2, WHITE);
 			arduboy.drawLine(128, 64, SCREENWIDTH / 2, SCREENHEIGHT / 2, WHITE);
@@ -835,8 +835,8 @@ void generateplanet()
 
 
 		// sometimes planets spawn off screen 
-		planetoffsetx = (rand() % 500) * (-1 + (2 * (rand() % 2)));
 
+		planetoffsetx = (rand() % 500) * (-1 + (2 * (rand() % 2)));
 		planetoffsety = (rand() % 500) * (-1 + (2 * (rand() % 2)));
 
 		planettextpts = 0;
@@ -920,12 +920,19 @@ void generateplanet()
 void hostiles()
 {
 
+	if (battlewon && (!indatabase)) {
+
+		return ;
+
+	}
 
 	if (rand() % 2 == 0) {
 
 		hostile = true;
 
 	} else {
+
+		battlewon = true;
 
 		hostile = false;
 
@@ -941,9 +948,9 @@ void hostiles()
 
 	}
 
-
-
 }
+
+
 
 
 
@@ -1013,6 +1020,41 @@ static void drawcursor()
 }
 
 
+
+void sectorfromseed(uint16_t seed)
+{
+
+
+	srand(seed);
+
+	newstars();
+
+	generateplanet();
+
+	hostiles();
+
+
+}
+
+
+
+void sectorparameters()
+{
+
+
+	srand(sector);
+
+	newstars();
+
+	generateplanet();
+
+	hostiles();
+
+
+}
+
+
+
 void gotowarp()
 {
 
@@ -1021,13 +1063,12 @@ void gotowarp()
 
 	hostile = false;
 
+	battlewon = false;
+
 	playerposx = 0;
 	playerposy = 0;
 
-	srand(sector);
-
-	newstars();
-
+	sectorparameters();
 
 }
 
@@ -1148,7 +1189,7 @@ void positionwarp()
 
 		arduboy.idle();
 
-		arduboy.delayShort(10);
+		arduboy.delayShort(16);
 
 		if (playerposx == 0 && playerposy == 0) {
 
@@ -1376,7 +1417,7 @@ bool setwarpcoords()
 
 		arduboy.idle();
 
-		arduboy.delayShort(50);
+		arduboy.delayShort(64);
 
 	}
 
@@ -1501,6 +1542,14 @@ uint8_t mapmenu()
 	arduboy.print("left combat mode");
 
 
+	if (!(hostile) && (!combatmode)) {
+
+		arduboy.setCursor(padding, 40 + padding);
+		arduboy.print("up database");
+
+	}
+
+
 	for (;;) {
 
 		arduboy.pollButtons();
@@ -1538,6 +1587,16 @@ uint8_t mapmenu()
 		if (arduboy.justPressed(LEFT_BUTTON) && (!(AUTOPILOT))) {
 
 			combatmode = !(combatmode);
+
+			held = 0;
+
+			return 0;
+
+		}
+
+		if (arduboy.justPressed(UP_BUTTON) && (!hostile) && (!(combatmode))) {
+
+			indatabase = true;
 
 			held = 0;
 
@@ -1702,6 +1761,24 @@ void generateitem()
 
 
 
+bool isresourcerich()
+{
+
+
+	if (rand() % 2 == 0) {
+
+		return true;
+
+	} else {
+
+		return false;
+
+	}
+
+}
+
+
+
 
 // generate procedural planet surface 
 void generateplanetsurf()
@@ -1819,7 +1896,7 @@ void generateplanetsurf()
 
 	arduboy.idle();
 
-	arduboy.delayShort(10);
+	arduboy.delayShort(2);
 
 
 }
@@ -1904,16 +1981,13 @@ void onplanetmenu(bool close)
 
 		}
 
+		// returning to space from planet
 		if (arduboy.justPressed(A_BUTTON)) {
 
 			playerposx = playerposxbackup;
 			playerposy = playerposybackup;
 
-			srand(sector);
-
-			newstars();
-
-			generateplanet();
+			sectorparameters();
 
 			planetoffsetx = planetoffsetxbackup;
 			planetoffsety = planetoffsetybackup;
@@ -2010,11 +2084,187 @@ void onplanet()
 
 
 
+void querydatabase(uint16_t seed)
+{
+
+
+	sectorfromseed(seed);
+
+	srand(seed);
+
+	bool isrich = isresourcerich();
+
+	planetxcoord = (SCREENWIDTH / 2);
+	planetycoord = (SCREENHEIGHT / 2);
+
+	planetoffsetx = 0;
+	planetoffsety = 0;
+
+	for (;;) {
+
+		arduboy.pollButtons();
+
+		if (arduboy.justPressed(B_BUTTON)) {
+
+			return ;
+
+		}
+
+		arduboy.clear();
+
+		if (PLANET) {
+
+			drawplanet();
+
+			if (HABITABLE) {
+
+				arduboy.print("planet is habitable");
+
+				if (isrich) {
+
+					arduboy.setCursor(0, 8);
+
+					arduboy.print("resource rich");
+
+				}
+
+
+
+			} else {
+
+				arduboy.print("planet not habitable");
+
+			}
+
+			planetdesignation(seed);
+
+		} else {
+
+			arduboy.print("no planet");
+
+		}
+
+		if (hostile) {
+
+			arduboy.setCursor(0, 40);
+
+			arduboy.print("Hostiles");
+
+		}
+		
+
+		arduboy.display();
+
+		arduboy.idle();
+
+		arduboy.delayShort(16);
+
+	}
+
+}	
+
+
+
+
+void enterdatabase()
+{
+
+	static uint16_t sect = sector;
+
+	planetoffsetxbackup = planetoffsetx;
+	planetoffsetybackup = planetoffsety;
+
+	for (;;) {
+
+		arduboy.clear();
+
+		arduboy.pollButtons();
+
+		uint8_t buttonsheld = helddown();
+
+		bool left = (buttonsheld & (1 << BLEFT)) > 0;
+		bool right = (buttonsheld & (1 << BRIGHT)) > 0;
+		bool up = (buttonsheld & (1 << BUP)) > 0;
+		bool down = (buttonsheld & (1 << BDOWN)) > 0;
+
+		if (left) {
+
+			sect--;
+
+		} else if (right) {
+
+			sect++;
+
+		} else if (up) {
+
+			sect *= 2;
+
+		} else if (down) {
+
+			sect /= 2;
+
+		} else if (arduboy.justPressed(B_BUTTON)) {
+
+			sectorparameters();
+
+			if (hostile && battlewon) {
+
+				hostile = false;
+
+			}
+
+			//playerposx = 0;
+			//playerposy = 0;
+
+			indatabase = false;
+
+			held = 0;
+
+			planetoffsetx = planetoffsetxbackup;
+			planetoffsety = planetoffsetybackup;
+
+			return;
+
+		} else if (arduboy.justPressed(A_BUTTON)) {
+
+			querydatabase(sect);
+
+			continue;
+
+		}
+
+		arduboy.print("sector: ");
+
+		arduboy.setCursor(50,0);
+
+		arduboy.print(sect);
+
+		arduboy.setCursor(0, 8);
+
+		arduboy.print("view sector: A");
+
+		arduboy.display();
+
+
+		arduboy.idle();
+
+		arduboy.delayShort(64);
+
+	}
+
+
+}
+
+
+
+
 
 void inspace()
 {
 
-	if (arduboy.justPressed(A_BUTTON)) {
+	if (!(indatabase)) {
+
+		if (arduboy.justPressed(A_BUTTON)) {
 
 
 		if ((!combatmode) && !(hostile)) {
@@ -2031,10 +2281,6 @@ void inspace()
 
 				gotowarp();
 
-				generateplanet();
-
-				hostiles();
-
 				held = 0;
 
 			}
@@ -2047,7 +2293,11 @@ void inspace()
 
 			uint8_t flag = mapmenu();
 
-			if (flag != 2) {
+			if (indatabase) {
+
+				return ;
+
+			} else if (flag != 2) {
 
 				flags = (flag == 1) ? (flags | (1 << AUTOPILOTBIT)) : (flags & ~(1 << AUTOPILOTBIT));
 
@@ -2092,17 +2342,16 @@ void inspace()
 
 
 			}
-			
 
 		}
 
 	}
 
-	if (!(AUTOPILOT)) {
+	if (!(AUTOPILOT) && (!(indatabase))) {
 
 		setmovedeltas();
 
-	} else {
+	} else if (!(indatabase)) {
 
 		bool terminated = autopilot();
 
@@ -2113,8 +2362,6 @@ void inspace()
 		}
 
 	}
-
-
 
 	bool isaligned = alignedwithplanet();
 	flags = (isaligned) ? (flags | (1 << (PLANETALIGNBIT))) : (flags & ~(1 << (PLANETALIGNBIT)));
@@ -2226,9 +2473,12 @@ void inspace()
 
 	}
 
-	// printplanetcoords();
-	//arduboy.setCursor(0, 8);
-	//arduboy.print(arduboy.cpuLoad())
+
+	} else {
+
+		enterdatabase();
+
+	}
 
 }
 
@@ -2263,8 +2513,7 @@ void loop()
 
 	}
 
-	//arduboy.setCursor(0, 16);
-	//arduboy.print(arduboy.cpuLoad());
+	
 	
 
 	if (!(restart)) {
