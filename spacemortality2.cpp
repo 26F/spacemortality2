@@ -1912,6 +1912,8 @@ void onplanetmenu(bool close)
 
 	arduboy.invert(false);
 
+	held = 0;
+
 	for (;;) {
 
 		arduboy.pollButtons();
@@ -2411,6 +2413,10 @@ void inspace()
 		printsector();
 
 	} else {
+
+		arduboy.setCursor(0, 48);
+
+		arduboy.print("combat mode");
 
 		printammo();
 
